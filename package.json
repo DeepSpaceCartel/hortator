@@ -1,0 +1,54 @@
+{
+  "name": "claude-pace",
+  "displayName": "Claude Pace",
+  "description": "Shows Claude subscription usage (session / weekly / per-model) with a marker for where usage would be at a steady pace.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": { "vscode": "^1.90.0" },
+  "extensionKind": ["workspace"],
+  "main": "./extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "contributes": {
+    "views": {
+      "explorer": [
+        { "type": "webview", "id": "claudePace.view", "name": "Claude Pace" }
+      ]
+    },
+    "commands": [
+      { "command": "claudePace.refresh", "title": "Claude Pace: Refresh now" },
+      { "command": "claudePace.focus", "title": "Claude Pace: Show usage" }
+    ],
+    "configuration": {
+      "title": "Claude Pace",
+      "properties": {
+        "claudePace.tolerance": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "description": "Percentage points around the pace marker that still count as \"on pace\"."
+        },
+        "claudePace.endpoint.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Poll Anthropic's undocumented OAuth usage endpoint using Claude Code's login. Provides per-model limits such as Fable and works without an active session."
+        },
+        "claudePace.endpoint.intervalSeconds": {
+          "type": "number",
+          "default": 120,
+          "minimum": 60,
+          "description": "How often to poll the usage endpoint."
+        },
+        "claudePace.file.path": {
+          "type": "string",
+          "default": "",
+          "description": "File written by scripts/statusline.js. Empty means <claude config dir>/pace/rate_limits.json."
+        }
+      }
+    }
+  }
+}
