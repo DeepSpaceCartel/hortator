@@ -96,7 +96,7 @@ A window that is behind pace keeps the status bar's normal text color. Some them
 ## Commands
 
 - **Hortator: Show usage**
-- **Hortator: Refresh now** (re-reads the local sources; the endpoint at most once every 30 seconds)
+- **Hortator: Refresh now**, also the refresh button in the panel's title bar. Re-reads the local sources and shows when it last checked; the endpoint, if enabled, at most once every 30 seconds. It cannot make Claude Code refresh its own cache.
 - **Hortator: Allow usage endpoint (uses Claude Code login)**
 - **Hortator: Stop using Claude Code login**
 - **Hortator: Set up Claude Code status line hook**

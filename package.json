@@ -41,13 +41,18 @@
       { "id": "hortator.deltaAhead", "description": "Hortator panel: usage beyond the steady pace marker, when a window is ahead of pace.", "defaults": { "dark": "charts.red", "light": "charts.red", "highContrast": "charts.red", "highContrastLight": "charts.red" } }
     ],
     "commands": [
-      { "command": "hortator.refresh", "title": "Hortator: Refresh now" },
+      { "command": "hortator.refresh", "title": "Hortator: Refresh now", "icon": "$(refresh)" },
       { "command": "hortator.focus", "title": "Hortator: Show usage" },
       { "command": "hortator.allowEndpoint", "title": "Hortator: Allow usage endpoint (uses Claude Code login)" },
       { "command": "hortator.revokeEndpoint", "title": "Hortator: Stop using Claude Code login" },
       { "command": "hortator.setupStatusLine", "title": "Hortator: Set up Claude Code status line hook" },
       { "command": "hortator.copyStatusLineSetup", "title": "Hortator: Copy Claude Code status line setup" }
     ],
+    "menus": {
+      "view/title": [
+        { "command": "hortator.refresh", "when": "view == hortator.view", "group": "navigation" }
+      ]
+    },
     "configuration": {
       "title": "Hortator",
       "properties": {

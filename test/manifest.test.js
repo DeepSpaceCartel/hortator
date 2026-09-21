@@ -58,3 +58,10 @@ test('the panel draws the deltas as solid colors, not stripes', () => {
   const panel = fs.readFileSync(path.join(root, 'src/view.js'), 'utf8');
   assert.ok(!panel.includes('repeating-linear-gradient'));
 });
+
+test('the refresh command has an icon and a button in the panel title bar', () => {
+  const refresh = pkg.contributes.commands.find((c) => c.command === 'hortator.refresh');
+  assert.match(refresh.icon, /^\$\(.+\)$/, 'a title bar button needs a codicon');
+  const button = pkg.contributes.menus['view/title'].find((m) => m.command === 'hortator.refresh');
+  assert.equal(button.when, `view == ${pkg.contributes.views.hortator[0].id}`);
+});

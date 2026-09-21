@@ -32,6 +32,7 @@ function activate(context) {
   let items = [];
   let itemKey = null;
   let offered = false;
+  let lastRefresh = 0;
 
   const focus = 'hortator.focus';
 
@@ -80,6 +81,8 @@ function activate(context) {
       ...[...snapshots].map(([id, s]) => ({ text: `${id}: read ${formatDuration(now - s.updatedAt)} ago` })),
       ...errorNotes.map((text) => ({ text, error: true })),
     ];
+    // Claude Code writes the cache, so a refresh may find nothing new; this shows that the check did happen.
+    if (lastRefresh) notes.push({ text: `last checked ${formatClock(lastRefresh, now)}` });
     if (errors.has('endpoint') && !snapshots.has('statusline')) {
       notes.push({ text: 'Tip: the status line hook needs no endpoint. Run "Hortator: Copy Claude Code status line setup" for session and weekly bars.' });
     }
@@ -233,6 +236,16 @@ function activate(context) {
       .then((pick) => pick === 'Set up' && setupStatusLine());
   };
 
+  /** Re-reads every source now (the endpoint, if on, at most every 30 seconds) and shows progress in the panel. */
+  const refresh = () =>
+    vscode.window.withProgress({ location: { viewId: 'hortator.view' } }, async () => {
+      running.forEach((r) => r.refresh?.(true));
+      lastRefresh = Date.now();
+      render();
+      // Long enough for the progress bar to be seen.
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    });
+
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('hortator.view', view),
     vscode.commands.registerCommand('hortator.allowEndpoint', () => setConsent(true)),
@@ -240,7 +253,7 @@ function activate(context) {
     vscode.commands.registerCommand('hortator.copyStatusLineSetup', copyStatusLineSetup),
     vscode.commands.registerCommand('hortator.setupStatusLine', setupStatusLine),
     vscode.commands.registerCommand(focus, () => vscode.commands.executeCommand('hortator.view.focus')),
-    vscode.commands.registerCommand('hortator.refresh', () => running.forEach((r) => r.refresh?.(true))),
+    vscode.commands.registerCommand('hortator.refresh', refresh),
     vscode.window.onDidChangeWindowState((s) => s.focused && render()),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (!e.affectsConfiguration('hortator')) return;
