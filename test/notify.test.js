@@ -19,7 +19,7 @@ test('first sight behind pace notifies; first sight on pace stays quiet', () => 
   const behind = planNotifications([win({ usedPct: 10 })], {}, NOW, OPTS);
   assert.equal(behind.toShow.length, 1);
   assert.equal(behind.toShow[0].level, 'info');
-  assert.match(behind.toShow[0].text, /^Weekly: 40 pts behind pace \(10% used, steady pace is 50%\)/);
+  assert.match(behind.toShow[0].text, /^Weekly: 40% behind pace \(10% used, steady pace is 50%\)/);
 
   assert.deepEqual(planNotifications([win({ usedPct: 50 })], {}, NOW, OPTS).toShow, []);
 });
@@ -27,7 +27,7 @@ test('first sight behind pace notifies; first sight on pace stays quiet', () => 
 test('ahead of pace warns and says when the limit would be hit', () => {
   const { toShow } = planNotifications([win({ usedPct: 75 })], {}, NOW, OPTS);
   assert.equal(toShow[0].level, 'warn');
-  // 75% after 3.5 days: 25 more points take 25 * 3.5 / 75 = 1d 4h; 3.5d - 1d 4h = 2d 8h remain until the reset.
+  // 75% after 3.5 days: 25 more percent take 25 * 3.5 / 75 = 1d 4h; 3.5d - 1d 4h = 2d 8h remain until the reset.
   assert.match(toShow[0].text, /hit the limit in 1d 4h, 2d 8h before it resets/);
 });
 
@@ -95,7 +95,7 @@ test('notifications that fire together in the same state become one popup', () =
   const merged = combine(toShow);
   assert.equal(merged.length, 1);
   assert.equal(merged[0].level, 'info');
-  assert.equal(merged[0].text, "Behind pace: Weekly (44 pts), Weekly · Fable (50 pts). There's unused quota, so you can speed up.");
+  assert.equal(merged[0].text, "Behind pace: Weekly (44%), Weekly · Fable (50%). There's unused quota, so you can speed up.");
 });
 
 test('combined ahead notifications warn and name the earliest limit; different states stay separate', () => {
@@ -104,7 +104,7 @@ test('combined ahead notifications warn and name the earliest limit; different s
   const ahead = combine(planNotifications([a, b], {}, NOW, OPTS).toShow);
   assert.equal(ahead.length, 1);
   assert.equal(ahead[0].level, 'warn');
-  assert.match(ahead[0].text, /^Ahead of pace: Weekly \(25 pts\), Weekly · Fable \(40 pts\)\. Slow down\. At this rate the earliest limit is hit in /);
+  assert.match(ahead[0].text, /^Ahead of pace: Weekly \(25%\), Weekly · Fable \(40%\)\. Slow down\. At this rate the earliest limit is hit in /);
 
   const mixed = combine(planNotifications([win({ usedPct: 10 }), win({ id: 'x', label: 'X', usedPct: 80 })], {}, NOW, OPTS).toShow);
   assert.deepEqual(mixed.map((m) => m.level).sort(), ['info', 'warn']);

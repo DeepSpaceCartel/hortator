@@ -86,8 +86,8 @@ test('bar puts the divider at the pace position', () => {
 });
 
 test('describe wording', () => {
-  assert.match(describe({ state: 'behind', deltaPct: -34.4 }), /^34 pts behind pace/);
-  assert.match(describe({ state: 'ahead', deltaPct: 12 }), /^12 pts ahead/);
+  assert.match(describe({ state: 'behind', deltaPct: -34.4 }), /^34% behind pace/);
+  assert.match(describe({ state: 'ahead', deltaPct: 12 }), /^12% ahead/);
   assert.equal(describe({ state: 'on', deltaPct: 1 }), 'on pace');
 });
 
@@ -118,4 +118,13 @@ test('formatClock adds the date only when it is not today', () => {
   const sameDay = formatClock(now + 30 * 60000, now);
   const nextDay = formatClock(now + 13 * HOUR, now);
   assert.ok(nextDay.length > sameDay.length, `${nextDay} should carry a date, ${sameDay} should not`);
+});
+
+test('status bar style: yellow when ahead, green on pace, untouched when behind, theme backgrounds near the limit', () => {
+  const { statusStyle } = require('../src/text');
+  assert.deepEqual(statusStyle({ state: 'on', usedPct: 40 }), { color: 'hortator.onPace' });
+  assert.deepEqual(statusStyle({ state: 'behind', usedPct: 10 }), {});
+  assert.deepEqual(statusStyle({ state: 'ahead', usedPct: 85 }), { color: 'hortator.ahead' });
+  assert.deepEqual(statusStyle({ state: 'ahead', usedPct: 95 }), { background: 'statusBarItem.warningBackground' });
+  assert.deepEqual(statusStyle({ state: 'on', usedPct: 100 }), { background: 'statusBarItem.errorBackground' });
 });

@@ -6,12 +6,14 @@ const path = require('path');
 const vscode = require('vscode');
 const { withPace, formatDuration } = require('./src/pace');
 const { merge } = require('./src/windows');
-const { statusLabel, describe, tooltip, formatClock, formatError } = require('./src/text');
+const { statusLabel, describe, tooltip, statusStyle, formatClock, formatError } = require('./src/text');
 const { fileSource } = require('./src/sources/file');
 const { endpointSource } = require('./src/sources/endpoint');
+const { claudeCacheSource } = require('./src/sources/claude-cache');
 const { PaceView } = require('./src/view');
 const { combine } = require('./src/notify');
-const { claimNotifications } = require('./src/claim');
+const { claimNotifications, claimOnce } = require('./src/claim');
+const { addStatusLine } = require('./src/statusline-setup');
 
 const TICK_MS = 15 * 1000;
 const NOTIFY_MAX_READING_AGE_MS = 15 * 60 * 1000;
@@ -29,10 +31,11 @@ function activate(context) {
   let running = [];
   let items = [];
   let itemKey = null;
+  let offered = false;
 
   const focus = 'hortator.focus';
 
-  const endpointEnabled = () => vscode.workspace.getConfiguration('hortator').get('endpoint.enabled', true);
+  const endpointEnabled = () => vscode.workspace.getConfiguration('hortator').get('endpoint.enabled', false);
   const consent = () => context.globalState.get(CONSENT_KEY);
   const endpointAllowed = () => endpointEnabled() && consent() === true;
 
@@ -63,27 +66,34 @@ function activate(context) {
       items[0].text = Number.isFinite(retryAt) && retryAt > now ? `$(warning) Hortator · retry ${formatClock(retryAt, now)}` : '$(pulse) Hortator';
       items[0].tooltip = ['No usage data yet', ...errorNotes].join('\n\n');
     }
+    const colored = vscode.workspace.getConfiguration('hortator').get('statusBar.colors', true);
     windows.forEach((w, i) => {
       items[i].text = i === 0 ? `$(pulse) ${statusLabel(w)}` : statusLabel(w);
       const md = new vscode.MarkdownString(tooltip(w, now));
       items[i].tooltip = md;
+      const style = colored ? statusStyle(w) : {};
+      items[i].color = style.color && new vscode.ThemeColor(style.color);
+      items[i].backgroundColor = style.background && new vscode.ThemeColor(style.background);
     });
 
     const notes = [
       ...[...snapshots].map(([id, s]) => ({ text: `${id}: read ${formatDuration(now - s.updatedAt)} ago` })),
       ...errorNotes.map((text) => ({ text, error: true })),
     ];
+    if (errors.has('endpoint') && !snapshots.has('statusline')) {
+      notes.push({ text: 'Tip: the status line hook needs no endpoint. Run "Hortator: Copy Claude Code status line setup" for session and weekly bars.' });
+    }
     if (endpointEnabled() && consent() !== true) {
       notes.push({ text: 'endpoint: off until allowed (Command Palette: "Hortator: Allow usage endpoint")' });
     }
     view.update({
       windows: windows.map((w) => ({ ...w, summary: describe(w), resetsIn: formatDuration(w.resetsAt - now) })),
       notes,
-      empty: endpointAllowed()
-        ? 'No usage data yet. See the notes below, and the "Hortator" output channel for details.'
-        : 'No usage data yet. Run "Hortator: Allow usage endpoint" from the Command Palette, or set up the Claude Code status line hook (see the README).',
+      empty:
+        'No usage data yet. Hortator shows the usage Claude Code caches in .claude.json, which appears once Claude Code has fetched it. See the notes below, and the README for the status line hook and the usage endpoint.',
     });
     notify(windows, now);
+    offerStatusLine();
   };
 
   const notify = (windows, now) => {
@@ -112,6 +122,7 @@ function activate(context) {
 
     const cfg = vscode.workspace.getConfiguration('hortator');
     const specs = [fileSource({ file: cfg.get('file.path') || path.join(configDir(), 'hortator', 'rate_limits.json') })];
+    if (cfg.get('claudeCache.enabled', true)) specs.push(claudeCacheSource());
     if (endpointAllowed()) {
       specs.push(endpointSource({ intervalMs: cfg.get('endpoint.intervalSeconds', 300) * 1000, configDir: configDir(), log }));
     }
@@ -158,13 +169,19 @@ function activate(context) {
     render();
   };
 
-  /** Copies the status line script to a path that survives extension updates and puts the setting on the clipboard. */
+  const hortatorDir = () => path.join(configDir(), 'hortator');
+
+  /** Copies the status line script to a path that survives extension updates and returns the command that runs it. */
+  const installStatusLineScript = () => {
+    const dest = path.join(hortatorDir(), 'statusline.js');
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(path.join(context.extensionPath, 'scripts', 'statusline.js'), dest);
+    return `node "${dest}"`;
+  };
+
   const copyStatusLineSetup = async () => {
     try {
-      const dest = path.join(configDir(), 'hortator', 'statusline.js');
-      fs.mkdirSync(path.dirname(dest), { recursive: true });
-      fs.copyFileSync(path.join(context.extensionPath, 'scripts', 'statusline.js'), dest);
-      const setting = { statusLine: { type: 'command', command: `node "${dest}"` } };
+      const setting = { statusLine: { type: 'command', command: installStatusLineScript() } };
       await vscode.env.clipboard.writeText(JSON.stringify(setting, null, 2));
       vscode.window.showInformationMessage(
         `Copied the statusLine setting to the clipboard. Paste it into ${path.join(configDir(), 'settings.json')} (it replaces any existing statusLine).`,
@@ -174,11 +191,54 @@ function activate(context) {
     }
   };
 
+  /** Adds the status line to Claude Code's settings.json, unless one is already there that is not ours. */
+  const setupStatusLine = async () => {
+    try {
+      const command = installStatusLineScript();
+      const file = path.join(configDir(), 'settings.json');
+      const before = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+      const result = addStatusLine(before, command);
+      if (result.status === 'exists') {
+        vscode.window.showInformationMessage('Hortator: the status line hook is already set up.');
+      } else if (result.status === 'added') {
+        if (before) fs.copyFileSync(file, `${file}.hortator-backup`);
+        const tmp = `${file}.${process.pid}.tmp`;
+        fs.writeFileSync(tmp, result.text);
+        fs.renameSync(tmp, file);
+        vscode.window.showInformationMessage(
+          `Hortator: added the status line hook to ${file}${before ? ' (backup: settings.json.hortator-backup)' : ''}. Bars appear after Claude Code's next response; restart a session if they do not.`,
+        );
+      } else {
+        // Never overwrite someone else's status line or a file we cannot parse.
+        await vscode.env.clipboard.writeText(JSON.stringify({ statusLine: { type: 'command', command } }, null, 2));
+        const why = result.status === 'conflict' ? `it already has a statusLine (${result.existing})` : 'it could not be parsed as JSON';
+        vscode.window.showWarningMessage(`Hortator left ${file} alone because ${why}. The Hortator setting is on your clipboard to merge in by hand.`);
+      }
+    } catch (e) {
+      vscode.window.showErrorMessage(`Hortator: could not set up the status line hook: ${e.message}`);
+    }
+  };
+
+  /** Offers the hook once per machine when the endpoint is failing and no hook data has arrived. */
+  const offerStatusLine = () => {
+    if (offered || !errors.has('endpoint') || snapshots.has('statusline') || !vscode.window.state.focused) return;
+    offered = true;
+    if (!claimOnce(hortatorDir(), 'statusline-offer')) return;
+    vscode.window
+      .showInformationMessage(
+        'Hortator cannot get usage from the endpoint right now. The Claude Code status line hook gives session and weekly usage without it. Set it up?',
+        'Set up',
+        'Not now',
+      )
+      .then((pick) => pick === 'Set up' && setupStatusLine());
+  };
+
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('hortator.view', view),
     vscode.commands.registerCommand('hortator.allowEndpoint', () => setConsent(true)),
     vscode.commands.registerCommand('hortator.revokeEndpoint', () => setConsent(false)),
     vscode.commands.registerCommand('hortator.copyStatusLineSetup', copyStatusLineSetup),
+    vscode.commands.registerCommand('hortator.setupStatusLine', setupStatusLine),
     vscode.commands.registerCommand(focus, () => vscode.commands.executeCommand('hortator.view.focus')),
     vscode.commands.registerCommand('hortator.refresh', () => running.forEach((r) => r.refresh?.(true))),
     vscode.window.onDidChangeWindowState((s) => s.focused && render()),

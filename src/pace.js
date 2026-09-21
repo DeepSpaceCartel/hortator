@@ -20,7 +20,7 @@ const LENGTH_MS = { session: 5 * HOUR, weekly: 7 * 24 * HOUR };
  * already elapsed. Behind the marker means quota is going unused.
  * @param {Window} w
  * @param {number} now epoch ms
- * @param {number} tolerance percentage points still counted as "on pace"
+ * @param {number} tolerance percent still counted as "on pace"
  */
 function withPace(w, now, tolerance = 5) {
   const start = w.resetsAt - w.lengthMs;

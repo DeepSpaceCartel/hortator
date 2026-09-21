@@ -26,9 +26,9 @@ function statusLabel(w) {
 
 /** One-line verdict on where usage stands relative to a steady pace. */
 function describe(w) {
-  const pts = Math.round(Math.abs(w.deltaPct));
-  if (w.state === 'behind') return `${pts} pts behind pace, so ${pts}% of the window's quota is unused so far`;
-  if (w.state === 'ahead') return `${pts} pts ahead of pace`;
+  const pct = Math.round(Math.abs(w.deltaPct));
+  if (w.state === 'behind') return `${pct}% behind pace: that much of the window's quota is unused so far`;
+  if (w.state === 'ahead') return `${pct}% ahead of pace`;
   return 'on pace';
 }
 
@@ -45,6 +45,22 @@ function tooltip(w, now) {
   return lines.join('\n\n');
 }
 
+// Status bar text colors by pace state. Behind pace has none, so it keeps the theme's normal foreground.
+// The ids are contributed in package.json so themes and users can override them.
+const STATE_COLOR = { on: 'hortator.onPace', ahead: 'hortator.ahead' };
+
+/**
+ * How a window's status bar item is colored. Near or at the limit it takes the status bar's own
+ * warning or error background (whose foreground the theme picks for contrast); otherwise the text
+ * gets the color of its pace state.
+ * @returns {{color?: string, background?: string}} theme color ids
+ */
+function statusStyle(w) {
+  if (w.usedPct >= 100) return { background: 'statusBarItem.errorBackground' };
+  if (w.usedPct >= 95) return { background: 'statusBarItem.warningBackground' };
+  return STATE_COLOR[w.state] ? { color: STATE_COLOR[w.state] } : {};
+}
+
 /** Local clock time, prefixed with the date when it is not today. */
 function formatClock(ms, now) {
   const d = new Date(ms);
@@ -56,7 +72,9 @@ function formatClock(ms, now) {
 function formatError({ msg, retryAt }, now) {
   if (!retryAt) return msg;
   const wait = retryAt - now;
+  // Server messages usually end in a period already.
+  msg = msg.replace(/[.\s]+$/, '');
   return wait > 0 ? `${msg}. Retrying at ${formatClock(retryAt, now)} (in ${formatDuration(wait)})` : `${msg}. Retrying now`;
 }
 
-module.exports = { bar, statusLabel, describe, tooltip, formatClock, formatError };
+module.exports = { bar, statusLabel, describe, tooltip, statusStyle, STATE_COLOR, formatClock, formatError };

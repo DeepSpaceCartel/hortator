@@ -95,4 +95,15 @@ function claimNotifications(dir, windows, now, opts) {
   );
 }
 
-module.exports = { claimNotifications };
+/** True for exactly one caller across all windows, ever (until the marker directory is removed). */
+function claimOnce(dir, name) {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(path.join(dir, `once-${name}`));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+module.exports = { claimNotifications, claimOnce };

@@ -27,7 +27,8 @@ function setup(t, replies) {
     return replies[Math.min(calls.length, replies.length) - 1]();
   });
   const ok = () => new Response(JSON.stringify(fixture), { status: 200 });
-  const limited = (seconds) => () => new Response(null, { status: 429, headers: seconds ? { 'retry-after': String(seconds) } : {} });
+  const limited = (seconds, body = null) => () =>
+    new Response(body, { status: 429, headers: seconds !== undefined ? { 'retry-after': String(seconds) } : {} });
   return { dir, calls, ok, limited };
 }
 
@@ -138,5 +139,29 @@ test('a forced refresh skips a fresh cache but not a rate limit block', async (t
   a.handle.refresh(true);
   await flush();
   assert.equal(s.calls.length, 2); // still blocked
+  a.handle.dispose();
+});
+
+test('Retry-After: 0 is reported as unusable and the server message is shown', async (t) => {
+  const body = JSON.stringify({ error: { type: 'rate_limit_error', message: 'Rate limited. Please try again later.' } });
+  const s = setup(t, [() => s.limited(0, body)()]);
+  const a = start(s.dir);
+  await flush();
+  assert.equal(a.errors[0], 'HTTP 429 (Retry-After: 0s is not usable, backing off): Rate limited. Please try again later.');
+  assert.equal(a.metas[0].retryAt - Date.now(), 600_000, 'falls back to the escalating backoff');
+
+  // A second window reads the same explanation from the shared cache.
+  const b = start(s.dir);
+  await flush();
+  assert.equal(b.errors[0], 'rate limited by Anthropic (Retry-After: 0s is not usable, backing off): Rate limited. Please try again later.');
+  a.handle.dispose();
+  b.handle.dispose();
+});
+
+test('a non-JSON 429 body does not break the error handling', async (t) => {
+  const s = setup(t, [() => s.limited(undefined, '<html>slow down</html>')()]);
+  const a = start(s.dir);
+  await flush();
+  assert.equal(a.errors[0], 'HTTP 429 (no Retry-After header, backing off)');
   a.handle.dispose();
 });

@@ -6,12 +6,11 @@ const STYLE = `
   body { padding: 0 12px 12px; color: var(--vscode-foreground); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }
   .row { margin: 12px 0; }
   .head { display: flex; justify-content: space-between; margin-bottom: 4px; }
-  .pct { font-variant-numeric: tabular-nums; }
   .bar { position: relative; height: 10px; background: var(--vscode-input-background); border: 1px solid var(--vscode-widget-border, transparent); border-radius: 2px; }
   .bar > div { position: absolute; top: 0; bottom: 0; }
   .fill { left: 0; background: var(--vscode-progressBar-background); }
-  .gap { background: repeating-linear-gradient(45deg, transparent 0 3px, var(--vscode-editorWarning-foreground) 3px 5px); opacity: .6; }
-  .over { background: var(--vscode-editorWarning-foreground); opacity: .85; }
+  .gap { background: var(--vscode-hortator-deltaBehind, var(--vscode-charts-green)); }
+  .over { background: var(--vscode-hortator-deltaAhead, var(--vscode-charts-red)); }
   .marker { width: 2px; top: -3px !important; bottom: -3px !important; margin-left: -1px; background: var(--vscode-foreground); }
   .sub, .muted { color: var(--vscode-descriptionForeground); font-size: .9em; margin-top: 4px; }
   .err { color: var(--vscode-errorForeground); }
@@ -46,7 +45,7 @@ const SCRIPT = `
       if (pace > used) bar.append(place(el('div', 'gap'), used, pace - used));
       else bar.append(place(el('div', 'over'), pace, used - pace));
       bar.append(place(el('div', 'marker'), pace));
-      bar.title = 'Marker: where usage would be at a steady pace (' + Math.round(w.pacePct) + '%)';
+      bar.title = 'Marker: steady pace (' + Math.round(w.pacePct) + '%). Green: quota not yet used to reach it. Red: usage beyond it.';
 
       const row = el('div', 'row');
       row.append(head, bar, el('div', 'sub', w.summary + ' · resets in ' + w.resetsIn));

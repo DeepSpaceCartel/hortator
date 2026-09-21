@@ -10,7 +10,25 @@ const URL = 'https://api.anthropic.com/api/oauth/usage';
 const MIN_GAP_MS = 30 * 1000;
 const MAX_BACKOFF_MS = 30 * 60 * 1000;
 // Instances that did not make the last request wake a little later, so the one that did can refresh the shared cache first.
-const describeRetryAfter = (header) => (header ? `Retry-After: ${header}s` : 'no Retry-After header, backing off');
+// A Retry-After of 0 (which this endpoint has been seen to send) says nothing useful, so it is
+// reported as unusable instead of as a wait.
+const describeRetryAfter = (header) => {
+  if (Number(header) > 0) return `Retry-After: ${header}s`;
+  return header ? `Retry-After: ${header}s is not usable, backing off` : 'no Retry-After header, backing off';
+};
+const withServerMessage = (text, serverMessage) => (serverMessage ? `${text}: ${serverMessage}` : text);
+
+/** The human-readable error the API sent with a failure, if it sent one. Never includes request headers. */
+async function serverMessage(res) {
+  try {
+    const body = await res.text();
+    const parsed = JSON.parse(body);
+    const message = parsed?.error?.message ?? parsed?.message;
+    return typeof message === 'string' ? message.slice(0, 200) : undefined;
+  } catch {
+    return undefined;
+  }
+}
 const clock = (ms) => new Date(ms).toLocaleTimeString();
 const followerDelay = (intervalMs) => 2000 + Math.random() * intervalMs * 0.1;
 
@@ -90,7 +108,7 @@ function endpointSource({ intervalMs, configDir, log = { info() {}, warn() {} } 
             log.info(`rate limited; next request at ${clock(cache.blockedUntil)}, in ${formatDuration(wait)} (shared with other windows)`);
             publish(cache);
             // After publish, because an update clears the source's error note.
-            onError(`rate limited by Anthropic (${describeRetryAfter(cache.retryAfter)})`, { retryAt: cache.blockedUntil });
+            onError(withServerMessage(`rate limited by Anthropic (${describeRetryAfter(cache.retryAfter)})`, cache.message), { retryAt: cache.blockedUntil });
             delay = wait + followerDelay(intervalMs);
           } else if (!force && cache.updatedAt && now - cache.updatedAt < intervalMs) {
             log.info(`using the reading another window took ${formatDuration(now - cache.updatedAt)} ago`);
@@ -106,13 +124,14 @@ function endpointSource({ intervalMs, configDir, log = { info() {}, warn() {} } 
             });
             if (res.status === 429) {
               const header = res.headers.get('retry-after');
+              const message = await serverMessage(res);
               // Repeated 429s escalate; the streak lives in the cache so it survives reloads and is shared.
               const streak = (cache.streak ?? 0) + 1;
               const wait = Number(header) > 0 ? Math.min(Number(header) * 1000, MAX_BACKOFF_MS) : Math.min(intervalMs * 2 ** streak, MAX_BACKOFF_MS);
               const blockedUntil = Date.now() + wait;
-              log.warn(`HTTP 429 (${describeRetryAfter(header)}); next request at ${clock(blockedUntil)}, in ${formatDuration(wait)}; consecutive rate limits: ${streak}`);
-              writeCache(cachePath, { ...cache, blockedUntil, streak, retryAfter: header || null });
-              throw Object.assign(new Error(`HTTP 429 (${describeRetryAfter(header)})`), { waitMs: wait, retryAt: blockedUntil });
+              log.warn(`HTTP 429 (${describeRetryAfter(header)})${message ? `, server said: ${message}` : ''}; next request at ${clock(blockedUntil)}, in ${formatDuration(wait)}; consecutive rate limits: ${streak}`);
+              writeCache(cachePath, { ...cache, blockedUntil, streak, retryAfter: header || null, message: message ?? null });
+              throw Object.assign(new Error(withServerMessage(`HTTP 429 (${describeRetryAfter(header)})`, message)), { waitMs: wait, retryAt: blockedUntil });
             }
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const at = Date.now();

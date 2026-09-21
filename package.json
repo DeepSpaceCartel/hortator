@@ -34,11 +34,18 @@
         { "type": "webview", "id": "hortator.view", "name": "Usage" }
       ]
     },
+    "colors": [
+      { "id": "hortator.onPace", "description": "Hortator status bar: a usage window that is on pace.", "defaults": { "dark": "charts.green", "light": "charts.green", "highContrast": "charts.green", "highContrastLight": "charts.green" } },
+      { "id": "hortator.ahead", "description": "Hortator status bar: a usage window ahead of pace, so you may run out early.", "defaults": { "dark": "charts.yellow", "light": "charts.yellow", "highContrast": "charts.yellow", "highContrastLight": "charts.yellow" } },
+      { "id": "hortator.deltaBehind", "description": "Hortator panel: the part of the steady pace not yet used, when a window is behind pace.", "defaults": { "dark": "charts.green", "light": "charts.green", "highContrast": "charts.green", "highContrastLight": "charts.green" } },
+      { "id": "hortator.deltaAhead", "description": "Hortator panel: usage beyond the steady pace marker, when a window is ahead of pace.", "defaults": { "dark": "charts.red", "light": "charts.red", "highContrast": "charts.red", "highContrastLight": "charts.red" } }
+    ],
     "commands": [
       { "command": "hortator.refresh", "title": "Hortator: Refresh now" },
       { "command": "hortator.focus", "title": "Hortator: Show usage" },
       { "command": "hortator.allowEndpoint", "title": "Hortator: Allow usage endpoint (uses Claude Code login)" },
       { "command": "hortator.revokeEndpoint", "title": "Hortator: Stop using Claude Code login" },
+      { "command": "hortator.setupStatusLine", "title": "Hortator: Set up Claude Code status line hook" },
       { "command": "hortator.copyStatusLineSetup", "title": "Hortator: Copy Claude Code status line setup" }
     ],
     "configuration": {
@@ -48,12 +55,22 @@
           "type": "number",
           "default": 5,
           "minimum": 0,
-          "description": "Percentage points around the pace marker that still count as \"on pace\"."
+          "description": "Percent of the window around the pace marker that still counts as \"on pace\"."
+        },
+        "hortator.claudeCache.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Read the usage Claude Code caches in its .claude.json (session, weekly and per-model limits). Makes no network requests and does not use your login."
+        },
+        "hortator.statusBar.colors": {
+          "type": "boolean",
+          "default": true,
+          "description": "Color the status bar items (green on pace, yellow ahead of pace, unchanged when behind) and use the warning or error background near or at the limit. Customize with the hortator.onPace and hortator.ahead theme colors."
         },
         "hortator.endpoint.enabled": {
           "type": "boolean",
-          "default": true,
-          "description": "Poll Anthropic's undocumented OAuth usage endpoint using Claude Code's login. Provides per-model limits such as Fable and works without an active session. Nothing is sent until you allow it once (prompt on first run, or the \"Hortator: Allow usage endpoint\" command)."
+          "default": false,
+          "description": "Also poll Anthropic's undocumented OAuth usage endpoint using Claude Code's login, which works without a Claude Code session running. Off by default because it sends your Claude Code token to api.anthropic.com and is rate limited. Nothing is sent until you allow it once (prompt, or the \"Hortator: Allow usage endpoint\" command)."
         },
         "hortator.endpoint.intervalSeconds": {
           "type": "number",

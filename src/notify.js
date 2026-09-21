@@ -11,14 +11,14 @@ const keyResetMs = (key) => Number(key.slice(key.lastIndexOf('@') + 1)) * 60000;
 
 /** Builds the message for a window that just entered its current state. */
 function message(w, now) {
-  const pts = Math.round(Math.abs(w.deltaPct));
+  const pct = Math.round(Math.abs(w.deltaPct));
   const used = Math.round(w.usedPct);
   const pace = Math.round(w.pacePct);
   const resets = formatDuration(w.resetsAt - now);
-  const base = { state: w.state, label: w.label, pts, limitInMs: w.limitInMs };
+  const base = { state: w.state, label: w.label, pct, limitInMs: w.limitInMs };
 
   if (w.state === 'behind') {
-    return { ...base, level: 'info', text: `${w.label}: ${pts} pts behind pace (${used}% used, steady pace is ${pace}%). There's unused quota, so you can speed up. Resets in ${resets}.` };
+    return { ...base, level: 'info', text: `${w.label}: ${pct}% behind pace (${used}% used, steady pace is ${pace}%). There's unused quota, so you can speed up. Resets in ${resets}.` };
   }
   if (w.state === 'ahead') {
     if (w.usedPct >= 100) return { ...base, level: 'warn', text: `${w.label}: limit reached. Resets in ${resets}.` };
@@ -26,7 +26,7 @@ function message(w, now) {
       w.limitInMs === null
         ? 'Slow down to make it last until the reset.'
         : `At this rate you'll hit the limit in ${formatDuration(w.limitInMs)}, ${formatDuration(w.resetsAt - now - w.limitInMs)} before it resets. Slow down.`;
-    return { ...base, level: 'warn', text: `${w.label}: ${pts} pts ahead of pace (${used}% used, steady pace is ${pace}%). ${tail}` };
+    return { ...base, level: 'warn', text: `${w.label}: ${pct}% ahead of pace (${used}% used, steady pace is ${pace}%). ${tail}` };
   }
   return { ...base, level: 'info', text: `${w.label}: on pace (${used}% used, steady pace is ${pace}%).` };
 }
@@ -80,7 +80,7 @@ function combine(items) {
   for (const n of items) groups.set(n.state, [...(groups.get(n.state) ?? []), n]);
   return [...groups.values()].map((g) => {
     if (g.length === 1) return { level: g[0].level, text: g[0].text };
-    const names = g.map((n) => `${n.label} (${n.pts} pts)`).join(', ');
+    const names = g.map((n) => `${n.label} (${n.pct}%)`).join(', ');
     if (g[0].state === 'behind') return { level: 'info', text: `Behind pace: ${names}. There's unused quota, so you can speed up.` };
     if (g[0].state === 'ahead') {
       const soonest = Math.min(...g.map((n) => n.limitInMs ?? Infinity));
