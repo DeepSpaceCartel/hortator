@@ -45,4 +45,18 @@ function tooltip(w, now) {
   return lines.join('\n\n');
 }
 
-module.exports = { bar, statusLabel, describe, tooltip };
+/** Local clock time, prefixed with the date when it is not today. */
+function formatClock(ms, now) {
+  const d = new Date(ms);
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toDateString() === new Date(now).toDateString() ? time : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${time}`;
+}
+
+/** A source error, with when it will retry (if it will) rendered against the current time. */
+function formatError({ msg, retryAt }, now) {
+  if (!retryAt) return msg;
+  const wait = retryAt - now;
+  return wait > 0 ? `${msg}. Retrying at ${formatClock(retryAt, now)} (in ${formatDuration(wait)})` : `${msg}. Retrying now`;
+}
+
+module.exports = { bar, statusLabel, describe, tooltip, formatClock, formatError };

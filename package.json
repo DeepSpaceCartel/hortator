@@ -1,52 +1,93 @@
 {
-  "name": "claude-pace",
-  "displayName": "Claude Pace",
-  "description": "Shows Claude subscription usage (session / weekly / per-model) with a marker for where usage would be at a steady pace.",
+  "name": "hortator",
+  "displayName": "Hortator",
+  "description": "Track your Claude subscription usage against a steady pace: session, weekly and per-model limits in the status bar, with notifications when you fall behind or run ahead.",
   "version": "0.1.0",
-  "publisher": "local",
-  "license": "UNLICENSED",
-  "private": true,
+  "publisher": "deepspacecartel",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "homepage": "https://github.com/DeepSpaceCartel/hortator#readme",
+  "repository": { "type": "git", "url": "https://github.com/DeepSpaceCartel/hortator.git" },
+  "bugs": { "url": "https://github.com/DeepSpaceCartel/hortator/issues" },
+  "categories": ["Other"],
+  "keywords": ["claude", "claude code", "anthropic", "usage", "rate limit", "quota", "pace", "status bar"],
+  "galleryBanner": { "color": "#1b2330", "theme": "dark" },
   "engines": { "vscode": "^1.90.0" },
   "extensionKind": ["workspace"],
+  "capabilities": {
+    "untrustedWorkspaces": { "supported": true },
+    "virtualWorkspaces": false
+  },
   "main": "./extension.js",
   "activationEvents": ["onStartupFinished"],
   "scripts": {
     "test": "node --test test/*.test.js"
   },
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "hortator", "title": "Hortator", "icon": "media/icon.svg" }
+      ]
+    },
     "views": {
-      "explorer": [
-        { "type": "webview", "id": "claudePace.view", "name": "Claude Pace" }
+      "hortator": [
+        { "type": "webview", "id": "hortator.view", "name": "Usage" }
       ]
     },
     "commands": [
-      { "command": "claudePace.refresh", "title": "Claude Pace: Refresh now" },
-      { "command": "claudePace.focus", "title": "Claude Pace: Show usage" }
+      { "command": "hortator.refresh", "title": "Hortator: Refresh now" },
+      { "command": "hortator.focus", "title": "Hortator: Show usage" },
+      { "command": "hortator.allowEndpoint", "title": "Hortator: Allow usage endpoint (uses Claude Code login)" },
+      { "command": "hortator.revokeEndpoint", "title": "Hortator: Stop using Claude Code login" },
+      { "command": "hortator.copyStatusLineSetup", "title": "Hortator: Copy Claude Code status line setup" }
     ],
     "configuration": {
-      "title": "Claude Pace",
+      "title": "Hortator",
       "properties": {
-        "claudePace.tolerance": {
+        "hortator.tolerance": {
           "type": "number",
           "default": 5,
           "minimum": 0,
           "description": "Percentage points around the pace marker that still count as \"on pace\"."
         },
-        "claudePace.endpoint.enabled": {
+        "hortator.endpoint.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Poll Anthropic's undocumented OAuth usage endpoint using Claude Code's login. Provides per-model limits such as Fable and works without an active session."
+          "description": "Poll Anthropic's undocumented OAuth usage endpoint using Claude Code's login. Provides per-model limits such as Fable and works without an active session. Nothing is sent until you allow it once (prompt on first run, or the \"Hortator: Allow usage endpoint\" command)."
         },
-        "claudePace.endpoint.intervalSeconds": {
+        "hortator.endpoint.intervalSeconds": {
           "type": "number",
-          "default": 120,
+          "default": 300,
           "minimum": 60,
           "description": "How often to poll the usage endpoint."
         },
-        "claudePace.file.path": {
+        "hortator.file.path": {
           "type": "string",
           "default": "",
-          "description": "File written by scripts/statusline.js. Empty means <claude config dir>/pace/rate_limits.json."
+          "description": "File written by the Claude Code status line hook. Empty means <claude config dir>/hortator/rate_limits.json."
+        },
+        "hortator.notifications.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a notification when a usage window moves between behind, on, and ahead of pace."
+        },
+        "hortator.notifications.windows": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["session", "weekly"] },
+          "default": ["weekly"],
+          "description": "Which kinds of windows notify. The 5h session window swings between ahead and behind with normal work, so it is off by default."
+        },
+        "hortator.notifications.states": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["behind", "on", "ahead"] },
+          "default": ["behind", "on", "ahead"],
+          "description": "Which transitions notify: entering \"behind\" (speed up), \"on\" pace, or \"ahead\" (slow down)."
+        },
+        "hortator.notifications.cooldownHours": {
+          "type": "number",
+          "default": 12,
+          "minimum": 0,
+          "description": "Minimum hours before the same window notifies again for the same state, so hovering around the tolerance edge does not spam."
         }
       }
     }

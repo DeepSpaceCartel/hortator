@@ -33,9 +33,9 @@ const SCRIPT = `
   };
   const clamp = (n) => Math.min(100, Math.max(0, n));
 
-  function render({ windows, notes }) {
+  function render({ windows, notes, empty }) {
     root.replaceChildren();
-    if (!windows.length) root.append(el('p', 'muted', 'No usage data yet. Enable the endpoint setting or hook up scripts/statusline.js.'));
+    if (!windows.length) root.append(el('p', 'muted', empty));
     for (const w of windows) {
       const used = clamp(w.usedPct), pace = clamp(w.pacePct);
       const head = el('div', 'head');

@@ -8,7 +8,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { withPace, formatDuration, LENGTH_MS, HOUR } = require('../src/pace');
 const { fromEndpoint, fromStatusline, merge } = require('../src/windows');
-const { bar, describe } = require('../src/text');
+const { bar, describe, formatClock, formatError } = require('../src/text');
 
 const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/usage.json'), 'utf8'));
 const win = (over = {}) => ({ id: 'w', label: 'W', short: 'W', group: 'weekly', usedPct: 10, resetsAt: 0, lengthMs: LENGTH_MS.weekly, updatedAt: 0, ...over });
@@ -103,4 +103,19 @@ test('statusline.js persists rate_limits atomically and prints a short line', ()
   const none = spawnSync('node', [path.join(__dirname, '../scripts/statusline.js'), path.join(dir, 'x.json')], { input: '{"model":{}}', encoding: 'utf8' });
   assert.equal(none.stdout, '');
   assert.equal(fs.existsSync(path.join(dir, 'x.json')), false);
+});
+
+test('formatError shows when a rate-limited source will retry, and stops counting down once due', () => {
+  const now = new Date(2026, 8, 21, 12, 0).getTime();
+  const soon = formatError({ msg: 'HTTP 429 (Retry-After: 420s)', retryAt: now + 7 * 60000 }, now);
+  assert.match(soon, /^HTTP 429 \(Retry-After: 420s\)\. Retrying at .+ \(in 7m\)$/);
+  assert.equal(formatError({ msg: 'HTTP 429', retryAt: now - 1 }, now), 'HTTP 429. Retrying now');
+  assert.equal(formatError({ msg: 'HTTP 500' }, now), 'HTTP 500');
+});
+
+test('formatClock adds the date only when it is not today', () => {
+  const now = new Date(2026, 8, 21, 12, 0).getTime();
+  const sameDay = formatClock(now + 30 * 60000, now);
+  const nextDay = formatClock(now + 13 * HOUR, now);
+  assert.ok(nextDay.length > sameDay.length, `${nextDay} should carry a date, ${sameDay} should not`);
 });

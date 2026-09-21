@@ -29,8 +29,11 @@ function withPace(w, now, tolerance = 5) {
   const deltaPct = w.usedPct - pacePct;
   const state = deltaPct > tolerance ? 'ahead' : deltaPct < -tolerance ? 'behind' : 'on';
   // Extrapolating from a sliver of the window is noise.
-  const projectedPct = elapsed >= 0.02 ? w.usedPct / elapsed : null;
-  return { ...w, pacePct, deltaPct, state, projectedPct };
+  const reliable = elapsed >= 0.02;
+  const projectedPct = reliable ? w.usedPct / elapsed : null;
+  // Time until the limit is hit if the average rate so far continues.
+  const limitInMs = reliable && w.usedPct > 0 ? Math.max(0, ((100 - w.usedPct) * elapsed * w.lengthMs) / w.usedPct) : null;
+  return { ...w, pacePct, deltaPct, state, projectedPct, limitInMs };
 }
 
 /** @param {number} ms */

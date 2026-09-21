@@ -2,7 +2,7 @@
 'use strict';
 
 // Claude Code status line command. Saves the subscription rate limits it is
-// given so the Claude Pace extension can read them, and prints a short line.
+// given so the Hortator extension can read them, and prints a short line.
 // Usage: node statusline.js [output-file]
 
 const fs = require('fs');
@@ -10,7 +10,7 @@ const os = require('os');
 const path = require('path');
 
 const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
-const out = process.argv[2] || path.join(configDir, 'pace', 'rate_limits.json');
+const out = process.argv[2] || path.join(configDir, 'hortator', 'rate_limits.json');
 
 let input = '';
 process.stdin.setEncoding('utf8');
